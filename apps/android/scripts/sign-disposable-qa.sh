@@ -12,7 +12,7 @@ keytool -genkeypair -storetype PKCS12 -keystore "$work/qa.p12" -alias temporaryq
 echo "QA signature stage 2: sign APK with V1 V2 V3"
 "$tools_dir/apksigner" sign --ks "$work/qa.p12" --ks-key-alias temporaryqa --ks-pass env:QA_SIGN_PASSWORD --key-pass env:QA_SIGN_PASSWORD --min-sdk-version 23 --v1-signing-enabled true --v2-signing-enabled true --v3-signing-enabled true --v4-signing-enabled false --out "$apk" "$work/unsigned-input.apk"
 echo "QA signature stage 3: inspect signatures"
-"$tools_dir/apksigner" verify --verbose --min-sdk-version 26 --print-certs "$apk" | tee "$work/verify.txt"
+"$tools_dir/apksigner" verify --verbose --min-sdk-version 23 --print-certs "$apk" | tee "$work/verify.txt"
 grep -F 'Verified using v1 scheme (JAR signing): true' "$work/verify.txt"
 grep -F 'Verified using v2 scheme (APK Signature Scheme v2): true' "$work/verify.txt"
 echo "QA signature stage 4: inspect embedded signature files"
