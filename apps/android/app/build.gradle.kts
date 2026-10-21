@@ -30,6 +30,11 @@ android {
     }
 
     signingConfigs {
+        getByName("debug") {
+            enableV1Signing = true
+            enableV2Signing = true
+            enableV3Signing = true
+        }
         if (sourceSigningConfigured) {
             create("sourceStable") {
                 storeFile = file(sourceSigningPath.get())
