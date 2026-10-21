@@ -5,6 +5,7 @@ on:
     paths:
       - .github/workflows/source-native-v1v2-diagnostic.yml
       - apps/android/scripts/sign-disposable-qa.sh
+      - apps/android/scripts/run-signed-qa.sh
   workflow_dispatch:
 permissions:
   contents: write
