@@ -219,11 +219,11 @@ assert.match(dailyApiSource, /streamModelPartnerComment/);
 assert.match(dailyApiSource, /safeLogError\('daily-model-partner-comment', error/);
 
 const formalSource = await readFile(new URL('../functions/models/model-formal-chat-core.js', import.meta.url), 'utf8');
-const streamRequestCluster = formalSource.slice(formalSource.indexOf('async function requestOpenRouterStream'), formalSource.indexOf('async function* readProviderSse'));
+const streamRequestCluster = formalSource.slice(formalSource.indexOf('async function requestProviderStream'), formalSource.indexOf('async function* readProviderSse'));
 assert.match(streamRequestCluster, /upstream_status: response\.status/);
-assert.match(streamRequestCluster, /provider_message_preview: preview/);
+assert.doesNotMatch(streamRequestCluster, /provider_message_preview: preview/);
 const streamChunkCluster = formalSource.slice(formalSource.indexOf('function streamChunkError'), formalSource.indexOf('function safeToolFailure'));
 assert.match(streamChunkCluster, /upstream_status: status/);
-assert.match(streamChunkCluster, /provider_message_preview: preview/);
+assert.doesNotMatch(streamChunkCluster, /provider_message_preview: preview/);
 
 console.log('daily-tools: ok');
