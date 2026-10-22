@@ -354,7 +354,7 @@ function safeFailureMetadata(model, settings, { stream = false, error = null, ab
     metadata: {
       requested_model: String(model || '').slice(0, 180) || null,
       resolved_model: null,
-      provider: String(model || '').startsWith('fucheers:') ? 'fucheers' : 'openrouter',
+      provider: 'openrouter',
       provider_route: null,
       reasoning_text: null,
       reasoning_summary: null,

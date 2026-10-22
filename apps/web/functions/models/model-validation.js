@@ -94,7 +94,6 @@ export function catalogModel(catalog, modelId) {
     ...(catalog?.groups?.openai_chat || []),
     ...(catalog?.groups?.free_test || []),
     ...(catalog?.groups?.openai_image || []),
-    ...(catalog?.groups?.fucheers_chat || []),
   ].find((model) => model.id === modelId) || null;
 }
 
@@ -103,7 +102,7 @@ export function supportsTemperature(modelId, model) {
     return model.supported_parameters.includes('temperature');
   }
   const id = String(modelId || '').toLowerCase();
-  return !(id.startsWith('openai/o') || id.startsWith('openai/gpt-5') || /^fucheers:(?:gpt-|o\d)/.test(id));
+  return !(id.startsWith('openai/o') || id.startsWith('openai/gpt-5'));
 }
 
 export function supportsReasoningControl(modelId, model) {
@@ -120,7 +119,7 @@ export function supportsTools(modelId, model) {
   if (parameters.length) {
     return parameters.includes('tools') || parameters.includes('tool_choice');
   }
-  return String(modelId || '').startsWith('openai/') || /^fucheers:(?:gpt-|o\d)/i.test(String(modelId || ''));
+  return String(modelId || '').startsWith('openai/');
 }
 
 function normalizeWebSearchTool(tool) {

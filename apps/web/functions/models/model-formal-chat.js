@@ -2,5 +2,5 @@ export {
   performFormalChat,
   performFormalChatWithTools,
   performFormalChatStream,
-  requestProviderChat,
+  requestOpenRouter,
 } from './model-formal-chat-core.js';

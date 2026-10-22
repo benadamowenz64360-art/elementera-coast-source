@@ -6,7 +6,6 @@ export function createModelsActions({
   toast,
   getSearchDraft,
   setSearch,
-  setProviderFilter,
   fetchCatalog,
   quickPicker,
 }) {
@@ -49,14 +48,10 @@ export function createModelsActions({
       return router.open('models');
     }
     if (name === 'quick-select') return selectChat(target.dataset.id, { closePicker: true });
-    if (name === 'filter-provider') {
-      setProviderFilter(target.dataset.provider);
-      return router.refresh({ preserveScroll: false });
-    }
     if (name === 'refresh') {
       try {
         await fetchCatalog(true);
-        toast('模型目录已刷新，各渠道状态见模型箱');
+        toast('模型目录已刷新');
         await router.refresh();
       } catch (error) {
         toast(`刷新失败：${error.message}`);
