@@ -198,6 +198,7 @@ fun ChatWindow(
                 attachmentUploading = state.attachmentUploading,
                 previewSource = attachmentPreviewSource,
                 isStreaming = state.isStreaming,
+                isFinalizing = state.isFinalizing,
                 enabled = !state.historyLoading,
                 onPickImage = { imagePicker.launch(arrayOf("image/png", "image/jpeg", "image/webp")) },
                 onPickFile = { filePicker.launch(arrayOf("*/*")) },

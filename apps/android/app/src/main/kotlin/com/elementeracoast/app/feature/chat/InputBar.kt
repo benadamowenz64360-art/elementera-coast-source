@@ -59,6 +59,7 @@ fun CoastComposer(
     attachmentUploading: Boolean,
     previewSource: AttachmentPreviewRemoteDataSource,
     isStreaming: Boolean,
+    isFinalizing: Boolean = false,
     enabled: Boolean = true,
     onPickImage: () -> Unit,
     onPickFile: () -> Unit,
@@ -72,7 +73,8 @@ fun CoastComposer(
     val canSend = enabled &&
         (value.trim().isNotEmpty() || pendingAttachments.isNotEmpty()) &&
         !attachmentUploading &&
-        !isStreaming
+        !isStreaming &&
+        !isFinalizing
     val plusGlyphColor = snowLetterComposerGlyphColor(MaterialTheme.colorScheme.onSurface)
 
     Column(
@@ -102,7 +104,7 @@ fun CoastComposer(
                 RoundComposerButton(
                     background = MaterialTheme.colorScheme.surfaceVariant,
                     foreground = plusGlyphColor,
-                    enabled = enabled && !isStreaming && !attachmentUploading,
+                    enabled = enabled && !isStreaming && !isFinalizing && !attachmentUploading,
                     onClick = { attachmentMenuOpen = true }
                 ) {
                     Icon(
@@ -185,7 +187,7 @@ fun CoastComposer(
                         BasicTextField(
                             value = value,
                             onValueChange = onValueChange,
-                            enabled = enabled && !isStreaming && !attachmentUploading,
+                            enabled = enabled && !isStreaming && !isFinalizing && !attachmentUploading,
                             modifier = Modifier.fillMaxWidth(),
                             textStyle = MaterialTheme.typography.bodyMedium.copy(
                                 color = MaterialTheme.colorScheme.onSurface,
@@ -200,7 +202,7 @@ fun CoastComposer(
                         Box(
                             modifier = Modifier
                                 .size(CoastChatTokens.ComposerMicTouch)
-                                .clickable(enabled = enabled && !isStreaming) {
+                                .clickable(enabled = enabled && !isStreaming && !isFinalizing) {
                                     onPlaceholder("语音输入不在 V1 范围内。")
                                 },
                             contentAlignment = Alignment.Center
@@ -225,7 +227,7 @@ fun CoastComposer(
             RoundComposerButton(
                 background = actionBackground,
                 foreground = actionForeground,
-                enabled = (enabled && !attachmentUploading) || isStreaming,
+                enabled = ((enabled && !isFinalizing) && !attachmentUploading) || isStreaming,
                 onClick = {
                     when {
                         isStreaming -> onStop()

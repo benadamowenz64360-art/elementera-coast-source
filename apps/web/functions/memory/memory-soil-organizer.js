@@ -22,6 +22,7 @@ export const SOIL_PREVIOUS_FIELD_CHARS = 1000;
 export const SOIL_BACKFILL_TURNS = 3;
 export const SOIL_PROMPT_TOTAL_CHARS = 28 * 1024;
 export const SOIL_ORGANIZE_MAX_TOKENS = 3200;
+export const PLAN_SOIL_MAX_RESULT_CHARS = 10000;
 
 export const SOIL_RESPONSE_FORMAT = Object.freeze({
   type: 'json_schema',
@@ -315,6 +316,13 @@ export async function organizeConversationSoil(env, conversationId, value) {
   const reply = value.trigger === 'reply';
   const force = value.force === true || reply;
   const requestedModel = String(value.model || '').trim().slice(0, 180);
+  const planPhase = String(value.plan_phase || '').trim();
+  if (planPhase && !['prepare', 'commit'].includes(planPhase)) {
+    throw new MemoryStoreError('invalid_plan_phase', '无效的本机 GPT 对话纸条操作。', 400);
+  }
+  if (planPhase && !/^chatgpt-plan:gpt-[a-z0-9._-]+$/.test(requestedModel)) {
+    throw new MemoryStoreError('invalid_plan_model', '整理当前对话的纸条只能使用已选择的本机 GPT 模型。', 400);
+  }
   const settings = soilSettings(value.settings || {});
   const oldSoil = await decorateSoilProvenance(
     env.COAST_CHAT_DB,
@@ -333,6 +341,18 @@ export async function organizeConversationSoil(env, conversationId, value) {
   const state = await readConversationState(env.COAST_CHAT_DB, conversationId);
   const turns = landing ? completedTurns(state) : visibleCompletedTurns(state);
   if (!turns.length) return { ok: true, skipped: true, reason: 'no_completed_turns', soil: oldSoil };
+  const latestTurn = turns.at(-1);
+  const activeModel = String(latestTurn?.assistant?.model_id || '').trim();
+  if (!planPhase && activeModel.startsWith('chatgpt-plan:')) {
+    throw new MemoryStoreError(
+      'plan_soil_requires_native',
+      'ChatGPT 套餐轮次的当前对话纸条必须由本机套餐模型整理；未调用其他模型供应商。',
+      409,
+    );
+  }
+  if (planPhase && activeModel !== requestedModel) {
+    throw new MemoryStoreError('plan_soil_model_mismatch', '本轮模型与当前对话纸条整理模型不一致。', 409);
+  }
   const scheduledTurn = landing
     || reply
     || turns.length === 1
@@ -344,10 +364,69 @@ export async function organizeConversationSoil(env, conversationId, value) {
   }
 
   const fallback = fallbackCurrentText(turns, landing);
+  if (planPhase === 'prepare') {
+    return {
+      ok: true,
+      skipped: false,
+      model: requestedModel,
+      prompt: soilPrompt(turns, oldSoil, settings.maxHandSeeds, { landing }),
+      expected_turn_id: latestTurn.turn_id,
+      expected_assistant_id: String(latestTurn.assistant?.id || ''),
+      expected_soil_revision: oldSoil.revision,
+      max_result_chars: PLAN_SOIL_MAX_RESULT_CHARS,
+    };
+  }
+  if (planPhase === 'commit') {
+    const matches = value.expected_turn_id === latestTurn.turn_id
+      && value.expected_assistant_id === String(latestTurn.assistant?.id || '')
+      && Number.isSafeInteger(value.expected_soil_revision)
+      && value.expected_soil_revision === oldSoil.revision;
+    if (!matches) {
+      throw new MemoryStoreError(
+        'plan_soil_stale',
+        '整理期间当前对话纸条或聊天记录已经改变；未覆盖较新的资料。',
+        409,
+      );
+    }
+    if (typeof value.result_text !== 'string' || value.result_text.length > PLAN_SOIL_MAX_RESULT_CHARS) {
+      throw new MemoryStoreError('plan_soil_result_invalid', '本轮整理内容长度无效。', 400);
+    }
+  }
   let organized;
   let organizedBy = null;
   let degradedReason = '';
   try {
+    if (planPhase === 'commit') {
+      organized = parseStrictJson(value.result_text);
+      const modes = ['replace', 'keep', 'clear'];
+      if (typeof organized.current_text !== 'string'
+        || !modes.includes(organized.hand_seeds_mode)
+        || !Array.isArray(organized.hand_seeds)
+        || !modes.includes(organized.do_not_repeat_mode)
+        || typeof organized.do_not_repeat !== 'string'
+        || !modes.includes(organized.pocket_candidates_mode)
+        || !Array.isArray(organized.pocket_candidates)) {
+        throw new MemoryStoreError(
+          'soil_organize_invalid',
+          'GPT 整理结果不符合当前对话纸条格式；旧资料保持不变。',
+          422,
+        );
+      }
+      const safeUsage = (key) => {
+        const n = value.usage?.[key];
+        return Number.isSafeInteger(n) && n >= 0 && n <= 100000000 ? n : null;
+      };
+      organizedBy = {
+        model_id: requestedModel,
+        usage: {
+          prompt_tokens: safeUsage('input_tokens'),
+          completion_tokens: safeUsage('output_tokens'),
+          cached_tokens: safeUsage('cached_tokens'),
+        },
+        generation_source: 'soil',
+        generated_at: Date.now(),
+      };
+    } else {
     const profile = await readProfile(env.COAST_CHAT_DB);
     const modelId = requestedModel || profile.current_chat_model || 'openai/gpt-4.1-nano';
     const basePrompt = soilPrompt(turns, oldSoil, settings.maxHandSeeds, { landing });
@@ -385,7 +464,9 @@ export async function organizeConversationSoil(env, conversationId, value) {
       }
     }
     if (!organized && lastJsonError) throw lastJsonError;
+    }
   } catch (error) {
+    if (planPhase) throw error;
     if (!(error instanceof ModelRequestError)
       && !(error instanceof MemoryStoreError && String(error.type || '').startsWith('soil_organize_'))) throw error;
     safeLogError('memory:soil-organize', error);
@@ -408,7 +489,6 @@ export async function organizeConversationSoil(env, conversationId, value) {
     };
   }
 
-  const latestTurn = turns.at(-1);
   const allowedTurnIds = new Set(turns.map((turn) => turn.turn_id).filter(Boolean));
   const fallbackExcerpt = [latestTurn?.user?.content, latestTurn?.assistant?.content]
     .map((part) => String(part || '').replace(/\s+/g, ' ').trim())
